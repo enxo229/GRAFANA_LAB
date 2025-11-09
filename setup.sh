@@ -83,13 +83,13 @@ fi
 echo ""
 echo -e "${YELLOW}[3/7] Verificando Docker Compose...${NC}"
 
-if ! docker compose version &> /dev/null; then
+if ! docker-compose version &> /dev/null; then
     echo -e "${RED}Docker Compose no está disponible${NC}"
     exit 1
 fi
 
 echo -e "${GREEN}✓ Docker Compose disponible${NC}"
-docker compose version
+docker-compose version
 
 # ============================================================================
 # 4. CREAR ESTRUCTURA DE DIRECTORIOS
