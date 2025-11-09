@@ -142,7 +142,7 @@ services:
     command: [ "-config.file=/etc/tempo.yaml" ]
     
     volumes:
-      - ./tempo/tempo.yml:/etc/tempo.yaml
+      - ./tempo/tempo-minimal.yaml:/etc/tempo.yaml
       - tempo_data:/var/tempo
     
     networks:
