@@ -1,0 +1,228 @@
+# Archivo compose.yaml para Docker Compose
+# ============================================================================
+# STACK DE OBSERVABILIDAD: Grafana + Prometheus + Loki + Tempo
+# Optimizado para t3.small (2 GB RAM)
+# Con soporte completo para OpenTelemetry (OTel)
+# ============================================================================
+
+networks:
+  observability:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+    # Red dedicada para aislar el stack de observabilidad
+
+volumes:
+  prometheus_data:
+    driver: local
+  loki_data:
+    driver: local
+  tempo_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+services:
+  # ==========================================================================
+  # GRAFANA - Dashboard y Visualización
+  # ==========================================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    
+    ports:
+      - "3000:3000"  # UI Web de Grafana
+      # URL: http://<IP-SERVIDOR>:3000
+      # Credenciales por defecto: admin/admin (cambiar en primer login)
+    
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_INSTALL_PLUGINS=grafana-clock-panel
+    
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      # Puedes pre-configurar datasources en ./grafana/provisioning/datasources/
+    
+    networks:
+      observability:
+        ipv4_address: 172.20.0.10
+    
+    mem_limit: 512m
+    cpus: 0.5
+    
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+
+  # ==========================================================================
+  # PROMETHEUS - Métricas
+  # ==========================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    
+    ports:
+      - "9090:9090"  # UI Web de Prometheus
+      # URL: http://<IP-SERVIDOR>:9090
+      # Endpoint para scraping: http://<IP-SERVIDOR>:9090/metrics
+    
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'      # Retención: 7 días
+      - '--storage.tsdb.retention.size=1GB'     # Tamaño máximo: 1GB
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'                # Permite reload vía API
+      - '--web.enable-remote-write-receiver'    # IMPORTANTE: Recibe métricas de OTel
+    
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    
+    networks:
+      observability:
+        ipv4_address: 172.20.0.20
+    
+    mem_limit: 768m
+    cpus: 0.7
+
+  # ==========================================================================
+  # LOKI - Logs
+  # ==========================================================================
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    restart: unless-stopped
+    
+    ports:
+      - "3100:3100"  # HTTP API
+      # URL para ingestar logs: http://<IP-SERVIDOR>:3100/loki/api/v1/push
+      # Compatible con Promtail, Fluentd, y OTel Collector
+    
+    command: -config.file=/etc/loki/local-config.yaml
+    
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    
+    networks:
+      observability:
+        ipv4_address: 172.20.0.30
+    
+    mem_limit: 512m
+    cpus: 0.5
+
+  # ==========================================================================
+  # TEMPO - Trazas Distribuidas
+  # ==========================================================================
+  tempo:
+    image: grafana/tempo:latest
+    container_name: tempo
+    restart: unless-stopped
+    
+    ports:
+      - "3200:3200"   # Tempo HTTP (para queries desde Grafana)
+      - "4317:4317"   # OTLP gRPC - IMPORTANTE para OTel
+      - "4318:4318"   # OTLP HTTP - IMPORTANTE para OTel
+      - "9411:9411"   # Zipkin (opcional)
+      - "14268:14268" # Jaeger ingest (opcional)
+    
+    # ENDPOINTS PARA OPENTELEMETRY:
+    # - gRPC: http://<IP-SERVIDOR>:4317
+    # - HTTP: http://<IP-SERVIDOR>:4318
+    
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    
+    volumes:
+      - ./tempo/tempo.yml:/etc/tempo.yaml
+      - tempo_data:/var/tempo
+    
+    networks:
+      observability:
+        ipv4_address: 172.20.0.40
+    
+    mem_limit: 384m
+    cpus: 0.3
+
+  # ==========================================================================
+  # OTEL COLLECTOR (OPCIONAL pero RECOMENDADO)
+  # ==========================================================================
+  # El OTel Collector actúa como gateway centralizado para recibir telemetría
+  # y distribuirla a Prometheus, Loki y Tempo
+  
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    restart: unless-stopped
+    
+    ports:
+      # ESTOS SON LOS PUERTOS QUE DEBES USAR EN TUS APLICACIONES:
+      - "4317:4317"   # OTLP gRPC receiver (RECOMENDADO)
+      - "4318:4318"   # OTLP HTTP receiver
+      - "8888:8888"   # Prometheus metrics del collector mismo
+      - "8889:8889"   # Prometheus exporter (métricas recibidas)
+      - "13133:13133" # Health check
+    
+    # CONFIGURACIÓN PARA TUS APPS:
+    # OTLP gRPC endpoint: http://<IP-SERVIDOR>:4317
+    # OTLP HTTP endpoint: http://<IP-SERVIDOR>:4318/v1/traces (traces)
+    #                     http://<IP-SERVIDOR>:4318/v1/metrics (metrics)
+    #                     http://<IP-SERVIDOR>:4318/v1/logs (logs)
+    
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    
+    volumes:
+      - ./otel-collector/config.yml:/etc/otel-collector-config.yaml
+    
+    networks:
+      observability:
+        ipv4_address: 172.20.0.50
+    
+    mem_limit: 256m
+    cpus: 0.3
+    
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+
+# ============================================================================
+# RESUMEN DE PUERTOS Y URLs PARA OPENTELEMETRY
+# ============================================================================
+#
+# OPCIÓN 1: Enviar directamente a cada servicio
+# ------------------------------------------------
+# Métricas → Prometheus:
+#   - Remote Write: http://<IP-SERVIDOR>:9090/api/v1/write
+#
+# Logs → Loki:
+#   - Push API: http://<IP-SERVIDOR>:3100/loki/api/v1/push
+#
+# Trazas → Tempo:
+#   - OTLP gRPC: http://<IP-SERVIDOR>:4317
+#   - OTLP HTTP: http://<IP-SERVIDOR>:4318
+#
+# OPCIÓN 2: Usar OTel Collector (RECOMENDADO)
+# ------------------------------------------------
+# TODO en uno → OTel Collector:
+#   - OTLP gRPC: http://<IP-SERVIDOR>:4317
+#   - OTLP HTTP: http://<IP-SERVIDOR>:4318
+#
+# El collector se encarga de enrutar a Prometheus, Loki y Tempo
+#
+# ============================================================================
+# ACCESO A UIs
+# ============================================================================
+# Grafana:    http://<IP-SERVIDOR>:3000 (admin/admin)
+# Prometheus: http://<IP-SERVIDOR>:9090
+# Tempo:      No tiene UI, se consulta desde Grafana
+#
+# ============================================================================

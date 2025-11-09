@@ -1,0 +1,134 @@
+# ============================================================================
+# LOKI CONFIGURATION
+# Archivo: ./loki/loki-config.yml
+# Optimizado para t3.small (modo single-binary, filesystem storage)
+# ============================================================================
+
+auth_enabled: false  # No auth para laboratorio
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  log_level: info
+
+# ============================================================================
+# INGESTER - Procesa logs entrantes
+# ============================================================================
+ingester:
+  lifecycler:
+    address: 127.0.0.1
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+    final_sleep: 0s
+  
+  chunk_idle_period: 5m       # Cuánto tiempo antes de flush
+  chunk_retain_period: 30s    # Retención en memoria
+  max_chunk_age: 1h           # Edad máxima de un chunk
+  chunk_target_size: 1048576  # 1MB por chunk
+  
+  # Límites de memoria
+  max_transfer_retries: 0
+
+# ============================================================================
+# SCHEMA CONFIG - Define cómo se almacenan los logs
+# ============================================================================
+schema_config:
+  configs:
+    - from: 2023-01-01
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
+
+# ============================================================================
+# STORAGE - Almacenamiento en filesystem (ideal para labs)
+# ============================================================================
+storage_config:
+  boltdb_shipper:
+    active_index_directory: /loki/boltdb-shipper-active
+    cache_location: /loki/boltdb-shipper-cache
+    cache_ttl: 24h
+    shared_store: filesystem
+  
+  filesystem:
+    directory: /loki/chunks
+
+# ============================================================================
+# LIMITS - Límites para controlar uso de recursos
+# ============================================================================
+limits_config:
+  enforce_metric_name: false
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h  # 7 días
+  
+  # Límites por stream
+  ingestion_rate_mb: 10        # MB/s por stream
+  ingestion_burst_size_mb: 20  # Burst permitido
+  
+  # Límites de queries
+  max_query_length: 721h       # ~30 días
+  max_query_lookback: 0
+  max_streams_per_user: 0      # Sin límite (lab)
+  max_global_streams_per_user: 5000
+  
+  # Retención
+  retention_period: 168h       # 7 días (ajustar según espacio)
+
+# ============================================================================
+# CHUNK STORE - Caché para mejorar performance
+# ============================================================================
+chunk_store_config:
+  max_look_back_period: 0
+
+# ============================================================================
+# TABLE MANAGER - Gestión de tablas (retención)
+# ============================================================================
+table_manager:
+  retention_deletes_enabled: true
+  retention_period: 168h  # 7 días
+
+# ============================================================================
+# COMPACTOR - Limpieza de datos antiguos
+# ============================================================================
+compactor:
+  working_directory: /loki/compactor
+  shared_store: filesystem
+  compaction_interval: 10m
+  retention_enabled: true
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 150
+
+# ============================================================================
+# RULER (opcional) - Para alertas basadas en logs
+# ============================================================================
+ruler:
+  storage:
+    type: local
+    local:
+      directory: /loki/rules
+  rule_path: /loki/rules-temp
+  alertmanager_url: http://localhost:9093
+  ring:
+    kvstore:
+      store: inmemory
+  enable_api: true
+
+# ============================================================================
+# NOTAS PARA OPENTELEMETRY:
+# ============================================================================
+# Loki recibe logs en el endpoint: http://<IP>:3100/loki/api/v1/push
+#
+# Formatos soportados:
+# 1. Loki native format (JSON)
+# 2. OTel Collector con loki exporter
+# 3. Promtail, Fluentd, Fluent Bit
+#
+# Ejemplo de configuración en OTel Collector:
+# exporters:
+#   loki:
+#     endpoint: http://loki:3100/loki/api/v1/push
+# ============================================================================

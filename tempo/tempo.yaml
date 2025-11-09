@@ -1,0 +1,185 @@
+# ============================================================================
+# TEMPO CONFIGURATION
+# Archivo: ./tempo/tempo.yml
+# Optimizado para t3.small (modo single-binary, local storage)
+# ============================================================================
+
+server:
+  http_listen_port: 3200
+  log_level: info
+
+# ============================================================================
+# DISTRIBUTOR - Recibe trazas entrantes
+# ============================================================================
+distributor:
+  receivers:
+    # OTLP (OpenTelemetry Protocol) - PRINCIPAL PARA OTEL
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317  # gRPC (RECOMENDADO)
+        http:
+          endpoint: 0.0.0.0:4318  # HTTP
+    
+    # Jaeger (opcional, por compatibilidad)
+    jaeger:
+      protocols:
+        thrift_http:
+          endpoint: 0.0.0.0:14268
+        grpc:
+          endpoint: 0.0.0.0:14250
+    
+    # Zipkin (opcional, por compatibilidad)
+    zipkin:
+      endpoint: 0.0.0.0:9411
+
+# ============================================================================
+# INGESTER - Procesa y agrupa trazas
+# ============================================================================
+ingester:
+  max_block_duration: 5m        # Duración máxima de un bloque
+  max_block_bytes: 10485760     # 10MB por bloque
+  complete_block_timeout: 15m   # Timeout para completar bloques
+  
+  trace_idle_period: 10s        # Tiempo antes de considerar traza completa
+  flush_check_period: 10s       # Frecuencia de flush checks
+
+# ============================================================================
+# COMPACTOR - Compacta bloques antiguos
+# ============================================================================
+compactor:
+  compaction:
+    block_retention: 168h       # 7 días de retención
+    compacted_block_retention: 1h
+    compaction_window: 1h
+    max_block_bytes: 107374182400  # 100GB
+    max_compaction_objects: 1000000
+  
+  ring:
+    kvstore:
+      store: inmemory
+
+# ============================================================================
+# STORAGE - Almacenamiento local
+# ============================================================================
+storage:
+  trace:
+    backend: local              # Almacenamiento en disco local
+    
+    local:
+      path: /var/tempo/traces   # Path dentro del contenedor
+    
+    # Configuración de bloques
+    block:
+      version: vParquet3        # Formato Parquet (eficiente)
+    
+    # Write-Ahead Log (WAL)
+    wal:
+      path: /var/tempo/wal
+      encoding: snappy          # Compresión
+    
+    # Caché para mejorar queries
+    cache: none                 # Deshabilitado para ahorrar RAM en t3.small
+    
+    pool:
+      max_workers: 50
+      queue_depth: 2000
+
+# ============================================================================
+# QUERIER - Responde queries de trazas
+# ============================================================================
+querier:
+  max_concurrent_queries: 5     # Limitar para t3.small
+  search:
+    max_duration: 0             # Sin límite en lab
+    query_timeout: 30s
+
+  frontend_worker:
+    frontend_address: localhost:9095
+    parallelism: 2              # Limitado para t3.small
+
+# ============================================================================
+# QUERY FRONTEND - Cachea y optimiza queries
+# ============================================================================
+query_frontend:
+  search:
+    max_duration: 0
+  trace_by_id:
+    query_shards: 2             # Limitado para t3.small
+
+# ============================================================================
+# METRICS GENERATOR (opcional) - Genera métricas desde trazas
+# ============================================================================
+metrics_generator:
+  registry:
+    external_labels:
+      source: tempo
+      cluster: lab
+  
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write  # Envía métricas a Prometheus
+        send_exemplars: true
+
+  processor:
+    service_graphs:
+      dimensions: []
+      histogram_buckets: [0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4, 12.8]
+    
+    span_metrics:
+      dimensions: []
+      histogram_buckets: [0.002, 0.004, 0.008, 0.016, 0.032, 0.064, 0.128, 0.256, 0.512, 1.024, 2.048, 4.096, 8.192]
+
+# ============================================================================
+# OVERRIDES - Configuración por tenant (no usado en single-tenant)
+# ============================================================================
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [service-graphs, span-metrics]
+
+# ============================================================================
+# MEMBERLIST - Para clustering (no usado en single instance)
+# ============================================================================
+memberlist:
+  abort_if_cluster_join_fails: false
+  bind_port: 7946
+  join_members:
+    - localhost:7946
+
+# ============================================================================
+# NOTAS PARA OPENTELEMETRY:
+# ============================================================================
+# ENDPOINTS PARA TUS APLICACIONES:
+#
+# 1. OTLP gRPC (RECOMENDADO):
+#    Endpoint: http://<IP-SERVIDOR>:4317
+#    
+#    Ejemplo en código (Go):
+#    exporter, _ := otlptracegrpc.New(context.Background(),
+#        otlptracegrpc.WithEndpoint("tu-servidor:4317"),
+#        otlptracegrpc.WithInsecure(),
+#    )
+#
+# 2. OTLP HTTP:
+#    Endpoint: http://<IP-SERVIDOR>:4318/v1/traces
+#    
+#    Ejemplo en código (Python):
+#    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+#    exporter = OTLPSpanExporter(endpoint="http://tu-servidor:4318/v1/traces")
+#
+# 3. Jaeger (legacy):
+#    Endpoint: http://<IP-SERVIDOR>:14268/api/traces
+#
+# 4. Zipkin (legacy):
+#    Endpoint: http://<IP-SERVIDOR>:9411/api/v2/spans
+#
+# ============================================================================
+# CONSULTA DE TRAZAS:
+# ============================================================================
+# Desde Grafana:
+# - Configura datasource tipo "Tempo"
+# - URL: http://tempo:3200
+# - Podrás buscar trazas por TraceID o con queries
+# ============================================================================
