@@ -94,17 +94,17 @@ docker compose version
 # ============================================================================
 # 4. CREAR ESTRUCTURA DE DIRECTORIOS
 # ============================================================================
-echo ""
-echo -e "${YELLOW}[4/7] Creando estructura de directorios...${NC}"
+# echo ""
+# echo -e "${YELLOW}[4/7] Creando estructura de directorios...${NC}"
 
-mkdir -p prometheus
-mkdir -p loki
-mkdir -p tempo
-mkdir -p otel-collector
-mkdir -p grafana/provisioning/datasources
-mkdir -p grafana/provisioning/dashboards
+# mkdir -p prometheus
+# mkdir -p loki
+# mkdir -p tempo
+# mkdir -p otel-collector
+# mkdir -p grafana/provisioning/datasources
+# mkdir -p grafana/provisioning/dashboards
 
-echo -e "${GREEN}✓ Directorios creados${NC}"
+# echo -e "${GREEN}✓ Directorios creados${NC}"
 
 # ============================================================================
 # 5. CONFIGURAR SWAP (para t3.small)
