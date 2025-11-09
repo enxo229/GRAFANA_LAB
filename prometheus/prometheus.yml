@@ -27,18 +27,6 @@ scrape_configs:
           service: 'prometheus'
 
   # --------------------------------------------------------------------------
-  # Métricas del OTel Collector
-  # --------------------------------------------------------------------------
-  - job_name: 'otel-collector'
-    static_configs:
-      - targets: ['otel-collector:8888']  # Métricas internas del collector
-        labels:
-          service: 'otel-collector'
-      - targets: ['otel-collector:8889']  # Métricas exportadas por el collector
-        labels:
-          service: 'otel-exported-metrics'
-
-  # --------------------------------------------------------------------------
   # Ejemplo: Scraping de una aplicación externa
   # --------------------------------------------------------------------------
   # Descomenta y modifica según tus necesidades
@@ -77,9 +65,10 @@ scrape_configs:
 # ============================================================================
 # NOTES PARA OTEL:
 # ============================================================================
-# Cuando uses OTel Collector, las métricas llegarán automáticamente a 
-# Prometheus vía Remote Write al endpoint:
-# http://prometheus:9090/api/v1/write
+# Para enviar métricas desde aplicaciones OpenTelemetry directamente a 
+# Prometheus, usa el endpoint Remote Write:
+# http://<IP-SERVIDOR>:9090/api/v1/write
 #
-# No necesitas configurar scrape_configs adicionales para apps que usen OTel
+# Ejemplo de configuración en tu app:
+# OTEL_EXPORTER_PROMETHEUS_ENDPOINT=http://tu-servidor:9090/api/v1/write
 # ============================================================================
