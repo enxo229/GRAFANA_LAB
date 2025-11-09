@@ -8,7 +8,7 @@ set -e  # Exit on error
 
 echo "=========================================="
 echo "Stack de Observabilidad - Setup"
-echo "Grafana + Prometheus + Loki + Tempo + OTel"
+echo "Grafana + Prometheus + Loki + Tempo"
 echo "=========================================="
 echo ""
 
@@ -100,7 +100,7 @@ docker-compose version
 # mkdir -p prometheus
 # mkdir -p loki
 # mkdir -p tempo
-# mkdir -p otel-collector
+# mkdir -p otel-collector  # Eliminado - no usamos collector
 # mkdir -p grafana/provisioning/datasources
 # mkdir -p grafana/provisioning/dashboards
 
@@ -205,8 +205,9 @@ if command -v ufw &> /dev/null && sudo ufw status | grep -q "Status: active"; th
     sudo ufw allow 3000/tcp comment 'Grafana'
     sudo ufw allow 9090/tcp comment 'Prometheus'
     sudo ufw allow 3100/tcp comment 'Loki'
-    sudo ufw allow 4317/tcp comment 'OTel gRPC'
-    sudo ufw allow 4318/tcp comment 'OTel HTTP'
+    sudo ufw allow 3200/tcp comment 'Tempo HTTP'
+    sudo ufw allow 4317/tcp comment 'Tempo OTLP gRPC'
+    sudo ufw allow 4318/tcp comment 'Tempo OTLP HTTP'
     echo -e "${GREEN}✓ Puertos abiertos en UFW${NC}"
 elif command -v firewall-cmd &> /dev/null; then
     echo "Firewalld detectado. Abriendo puertos..."
@@ -235,7 +236,6 @@ echo "1. Coloca los archivos de configuración en sus respectivos directorios:"
 echo "   - prometheus/prometheus.yml"
 echo "   - loki/loki-config.yml"
 echo "   - tempo/tempo.yml"
-echo "   - otel-collector/config.yml"
 echo ""
 echo "2. Inicia el stack:"
 echo "   docker compose up -d"

@@ -110,7 +110,7 @@ services:
     command: -config.file=/etc/loki/local-config.yaml
     
     volumes:
-      - ./loki/loki-config.yml:/etc/loki/local-config.yaml
+      - ./loki/loki-config.yaml:/etc/loki/local-config.yaml
       - loki_data:/loki
     
     networks:
@@ -152,53 +152,13 @@ services:
     mem_limit: 384m
     cpus: 0.3
 
-  # ==========================================================================
-  # OTEL COLLECTOR (OPCIONAL pero RECOMENDADO)
-  # ==========================================================================
-  # El OTel Collector actúa como gateway centralizado para recibir telemetría
-  # y distribuirla a Prometheus, Loki y Tempo
-  
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:latest
-    container_name: otel-collector
-    restart: unless-stopped
-    
-    ports:
-      # ESTOS SON LOS PUERTOS QUE DEBES USAR EN TUS APLICACIONES:
-      - "4317:4317"   # OTLP gRPC receiver (RECOMENDADO)
-      - "4318:4318"   # OTLP HTTP receiver
-      - "8888:8888"   # Prometheus metrics del collector mismo
-      - "8889:8889"   # Prometheus exporter (métricas recibidas)
-      - "13133:13133" # Health check
-    
-    # CONFIGURACIÓN PARA TUS APPS:
-    # OTLP gRPC endpoint: http://<IP-SERVIDOR>:4317
-    # OTLP HTTP endpoint: http://<IP-SERVIDOR>:4318/v1/traces (traces)
-    #                     http://<IP-SERVIDOR>:4318/v1/metrics (metrics)
-    #                     http://<IP-SERVIDOR>:4318/v1/logs (logs)
-    
-    command: ["--config=/etc/otel-collector-config.yaml"]
-    
-    volumes:
-      - ./otel-collector/config.yml:/etc/otel-collector-config.yaml
-    
-    networks:
-      observability:
-        ipv4_address: 172.20.0.50
-    
-    mem_limit: 256m
-    cpus: 0.3
-    
-    depends_on:
-      - prometheus
-      - loki
-      - tempo
+
 
 # ============================================================================
 # RESUMEN DE PUERTOS Y URLs PARA OPENTELEMETRY
 # ============================================================================
 #
-# OPCIÓN 1: Enviar directamente a cada servicio
+# Enviar directamente a cada servicio:
 # ------------------------------------------------
 # Métricas → Prometheus:
 #   - Remote Write: http://<IP-SERVIDOR>:9090/api/v1/write
@@ -209,14 +169,6 @@ services:
 # Trazas → Tempo:
 #   - OTLP gRPC: http://<IP-SERVIDOR>:4317
 #   - OTLP HTTP: http://<IP-SERVIDOR>:4318
-#
-# OPCIÓN 2: Usar OTel Collector (RECOMENDADO)
-# ------------------------------------------------
-# TODO en uno → OTel Collector:
-#   - OTLP gRPC: http://<IP-SERVIDOR>:4317
-#   - OTLP HTTP: http://<IP-SERVIDOR>:4318
-#
-# El collector se encarga de enrutar a Prometheus, Loki y Tempo
 #
 # ============================================================================
 # ACCESO A UIs

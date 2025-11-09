@@ -1,6 +1,6 @@
 # Stack de Observabilidad con OpenTelemetry
 
-Stack completo de observabilidad optimizado para AWS t3.small (2 GB RAM) con soporte para OpenTelemetry.
+Stack completo de observabilidad optimizado para AWS t3.small (2 GB RAM) con soporte directo para OpenTelemetry.
 
 ## 📋 Componentes
 
@@ -8,7 +8,6 @@ Stack completo de observabilidad optimizado para AWS t3.small (2 GB RAM) con sop
 - **Prometheus** (v2.48.1) - Métricas
 - **Loki** (v2.9.3) - Logs
 - **Tempo** (v2.3.1) - Trazas distribuidas
-- **OpenTelemetry Collector** (v0.91.0) - Gateway de telemetría
 
 ## 🚀 Instalación Rápida
 
@@ -36,8 +35,6 @@ Crea la siguiente estructura de directorios y archivos:
 │   └── loki-config.yml
 ├── tempo/
 │   └── tempo.yml
-├── otel-collector/
-│   └── config.yml
 └── grafana/
     └── provisioning/
         └── datasources/
@@ -69,32 +66,13 @@ Abre tu navegador y accede a:
 
 ## 🔌 Endpoints para OpenTelemetry
 
-### Opción 1: Enviar directamente a OTel Collector (RECOMENDADO)
-
-El OpenTelemetry Collector actúa como gateway centralizado que distribuye automáticamente la telemetría a Prometheus, Loki y Tempo.
-
-#### OTLP gRPC (Recomendado)
-```
-Endpoint: http://TU_IP:4317
-```
-
-#### OTLP HTTP
-```
-Endpoint base: http://TU_IP:4318
-
-Rutas específicas:
-- Trazas:   http://TU_IP:4318/v1/traces
-- Métricas: http://TU_IP:4318/v1/metrics
-- Logs:     http://TU_IP:4318/v1/logs
-```
-
-### Opción 2: Enviar directamente a cada servicio
-
-Si prefieres no usar el OTel Collector:
+### Enviar directamente a cada servicio
 
 - **Prometheus** (Remote Write): `http://TU_IP:9090/api/v1/write`
 - **Loki** (Push API): `http://TU_IP:3100/loki/api/v1/push`
-- **Tempo** (OTLP): `http://TU_IP:4317`
+- **Tempo** (OTLP): 
+  - gRPC: `http://TU_IP:4317`
+  - HTTP: `http://TU_IP:4318`
 
 ## 💻 Ejemplos de Configuración por Lenguaje
 
@@ -111,7 +89,7 @@ from opentelemetry.sdk.resources import Resource
 resource = Resource.create({"service.name": "mi-servicio-python"})
 provider = TracerProvider(resource=resource)
 
-# Configurar exportador OTLP
+# Configurar exportador OTLP directo a Tempo
 otlp_exporter = OTLPSpanExporter(
     endpoint="http://TU_IP:4317",
     insecure=True  # Solo para laboratorio
@@ -251,8 +229,9 @@ export OTEL_SERVICE_NAME=mi-servicio
 export OTEL_RESOURCE_ATTRIBUTES=environment=lab,version=1.0,team=backend
 export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 export OTEL_TRACES_EXPORTER=otlp
-export OTEL_METRICS_EXPORTER=otlp
-export OTEL_LOGS_EXPORTER=otlp
+# Para métricas y logs, configurar exportadores específicos
+export OTEL_METRICS_EXPORTER=prometheus
+export OTEL_LOGS_EXPORTER=none  # O configurar para Loki
 ```
 
 ## 📊 Uso de Grafana
@@ -377,22 +356,6 @@ swapon --show
 # En loki-config.yml: retention_period: 72h
 ```
 
-### Problema: No se reciben datos en OTel Collector
-
-```bash
-# Ver logs del collector
-docker compose logs -f otel-collector
-
-# Verificar que el puerto esté abierto
-sudo netstat -tuln | grep 4317
-
-# Probar conectividad desde tu app
-telnet TU_IP 4317
-
-# Ver métricas internas del collector
-curl http://localhost:8888/metrics
-```
-
 ### Problema: Grafana no muestra datos
 
 1. Verifica que los datasources estén configurados:
@@ -421,11 +384,6 @@ curl http://localhost:8888/metrics
 ### Tempo
 - `tempo_ingester_traces_created_total`: Trazas creadas
 - `tempo_ingester_bytes_received_total`: Bytes recibidos
-
-### OTel Collector
-- `otelcol_receiver_accepted_spans`: Spans recibidos
-- `otelcol_receiver_refused_spans`: Spans rechazados
-- `otelcol_exporter_sent_spans`: Spans enviados
 
 ## 🔐 Seguridad para Producción
 
