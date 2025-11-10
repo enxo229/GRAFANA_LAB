@@ -20,6 +20,13 @@ prometheus.remote_write "metrics_service" {
 	}
 }
 
+prometheus.remote_write "grafana_oss" {
+	endpoint {
+		url = "http://18.220.64.232:9090/api/v1/write"
+	}
+}
+
+
 loki.write "grafana_cloud_loki" {
 	endpoint {
 		url = "https://logs-prod-036.grafana.net/loki/api/v1/push"
@@ -69,7 +76,7 @@ prometheus.scrape "integrations_node_exporter" {
 }
 
 prometheus.relabel "integrations_node_exporter" {
-  forward_to = [prometheus.remote_write.metrics_service.receiver]
+  forward_to = [prometheus.remote_write.metrics_service.receiver, prometheus.remote_write.grafana_oss.receiver]
 
   rule {
     source_labels = ["__name__"]
