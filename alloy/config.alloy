@@ -20,12 +20,6 @@ prometheus.remote_write "metrics_service" {
 	}
 }
 
-prometheus.remote_write "grafana_oss" {
-	endpoint {
-		url = "http://18.220.64.232:9090/api/v1/write"
-	}
-}
-
 
 loki.write "grafana_cloud_loki" {
 	endpoint {
