@@ -70,7 +70,7 @@ prometheus.scrape "integrations_node_exporter" {
 }
 
 prometheus.relabel "integrations_node_exporter" {
-  forward_to = [prometheus.remote_write.metrics_service.receiver, prometheus.remote_write.grafana_oss.receiver]
+  forward_to = [prometheus.remote_write.metrics_service.receiver]
 
   rule {
     source_labels = ["__name__"]
