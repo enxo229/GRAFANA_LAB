@@ -114,7 +114,7 @@ filelogs_module "integrations_node_exporter" {
 }
 
 prometheus.exporter.postgres "postgres_exporter" {
-    data_source_names = "postgresql://master_homelab:E9NP&ineZZq89$@homelab-db.clgyym08696j.us-east-2.rds.amazonaws.com:5432/homelab-db?sslmode=disable"
+    data_source_names = ["postgresql://homelab-db:E9NP&ineZZq89$@homelab-db.clgyym08696j.us-east-2.rds.amazonaws.com:5432/postgres?sslmode=disable"]
 }
 
 //FILELOGS
