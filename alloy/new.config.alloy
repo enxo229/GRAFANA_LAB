@@ -26,7 +26,6 @@ prometheus.remote_write "grafana_oss" {
 	}
 }
 
-
 loki.write "grafana_cloud_loki" {
 	endpoint {
 		url = "https://logs-prod-036.grafana.net/loki/api/v1/push"
@@ -75,6 +74,15 @@ prometheus.scrape "integrations_node_exporter" {
   forward_to = [prometheus.relabel.integrations_node_exporter.receiver]
 }
 
+prometheus.scrape "postgres_exporter" {
+  targets = prometheus.exporter.postgres.postgres_exporter.targets
+  forward_to = [prometheus.relabel.postgres_exporter.receiver]
+}
+
+prometheus.relabel "postgres_exporter" {
+  forward_to = [prometheus.remote_write.metrics_service.receiver, prometheus.remote_write.grafana_oss.receiver]
+}
+
 prometheus.relabel "integrations_node_exporter" {
   forward_to = [prometheus.remote_write.metrics_service.receiver, prometheus.remote_write.grafana_oss.receiver]
 
@@ -103,6 +111,10 @@ journal_module "integrations_node_exporter" {
 
 filelogs_module "integrations_node_exporter" {
   forward_to = [loki.relabel.integrations_node_exporter.receiver] 
+}
+
+prometheus.exporter.postgres "postgres_exporter" {
+    data_source_names = "postgresql://master_homelab:E9NP&ineZZq89$@homelab-db.clgyym08696j.us-east-2.rds.amazonaws.com:5432/homelab-db?sslmode=disable"
 }
 
 //FILELOGS
